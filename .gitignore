@@ -1,0 +1,38 @@
+# Python 생성 산출물
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.dylib
+*.egg-info/
+*.egg
+build/
+dist/
+wheels/
+pip-wheel-metadata/
+
+# 테스트 & 품질 도구
+.pytest_cache/
+.coverage*
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# 환경/로컬 설정
+.env
+.env.*
+!.env.example
+.python-version
+.venv
+.venv*/
+
+# 에디터/OS별 파일
+.DS_Store
+.idea/
+.vscode/
+
+# 로그 및 기타 임시 파일
+*.log
+*.sqlite3
+celerybeat-schedule

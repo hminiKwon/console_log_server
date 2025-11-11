@@ -1,0 +1,33 @@
+[project]
+name = "console-log-server"
+version = "0.1.0"
+description = "Simple FastAPI service for collecting console log messages"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.110.0,<1.0.0",
+    "uvicorn[standard]>=0.27.0,<1.0.0",
+    "pydantic-settings>=2.3.0,<3.0.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
+    "pymysql>=1.1.0,<2.0.0",
+    "passlib[bcrypt]>=1.7.0,<2.0.0",
+    "email-validator>=2.1.0,<3.0.0",
+    "alembic>=1.13.0,<2.0.0",
+    "pyjwt[crypto]>=2.8.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4,<9.0",
+    "httpx>=0.27,<0.28",
+]
+
+[project.scripts]
+console-log-server = "console_log_server.main:run"
+console-log-server-dev = "console_log_server.main:run_dev"
+
+[tool.uv]
+package = true
+
+[tool.setuptools.packages.find]
+include = ["console_log_server"]
