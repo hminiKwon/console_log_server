@@ -17,7 +17,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     """로그인 요청 스키마."""
 
-    username: str = Field(min_length=3, max_length=50)
+    email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     session_id: str | None = Field(default=None)
     user_agent: str | None = Field(default=None)

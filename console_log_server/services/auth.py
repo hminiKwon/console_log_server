@@ -48,7 +48,7 @@ class AuthService:
         return user
 
     def authenticate(self, payload: LoginRequest) -> User:
-        user = self.repository.get_by_username(payload.username)
+        user = self.repository.get_by_email(payload.email)
 
         if user is None:
             raise HTTPException(
