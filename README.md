@@ -31,7 +31,7 @@ console_log_server/
 
 - [uv](https://github.com/astral-sh/uv) 0.2.0 이상
 - Python 3.14+
-- 로컬 Ollama에서 `qwer3:1.7b` 모델이 준비되어 있어야 `/ai/chat` 엔드포인트가 동작합니다. (`ollama pull qwer3:1.7b`)
+- 로컬 Ollama에서 `qwen3:1.7b` 모델이 준비되어 있어야 `/ai/chat` 엔드포인트가 동작합니다. (`ollama pull qwen3:1.7b`)
 
 ## 빠른 시작
 
@@ -64,7 +64,7 @@ CONSOLE_LOG_SERVER_JWT_REFRESH_COOKIE_SECURE=false
 CONSOLE_LOG_SERVER_JWT_REFRESH_COOKIE_SAMESITE=lax
 CONSOLE_LOG_SERVER_JWT_SESSION_COOKIE_NAME=session_id
 CONSOLE_LOG_SERVER_OLLAMA_HOST=http://127.0.0.1:11434
-CONSOLE_LOG_SERVER_OLLAMA_MODEL=qwer3:1.7b
+CONSOLE_LOG_SERVER_OLLAMA_MODEL=qwen3:1.7b
 ```
 
 ## 데이터베이스 마이그레이션
@@ -106,7 +106,7 @@ uv run pytest
 - `POST /auth/register` — 사용자 생성 + 액세스 토큰 반환 (리프레시 토큰은 HttpOnly 쿠키, 세션 ID는 일반 쿠키에 저장)
 - `POST /auth/login` — 인증 후 액세스 토큰 갱신 (같은 세션 ID 기준으로 기존 리프레시 토큰 폐기)
 - `POST /auth/refresh` — 쿠키에 저장된 리프레시 토큰/세션 정보로 액세스 토큰 재발급
-- `POST /ai/chat` — 로컬 Ollama(`qwer3:1.7b`)를 사용한 챗봇 응답 반환, 보호된 엔드포인트
+- `POST /ai/chat` — 로컬 Ollama(`qwen3:1.7b`)를 사용한 챗봇 응답 반환, 보호된 엔드포인트
 
 모든 보호된 API 요청에는 `Authorization: Bearer <access_token>` 헤더가 필요합니다.
 
