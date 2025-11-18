@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="${ROOT_DIR}/logs"
 mkdir -p "${LOG_DIR}"
 
@@ -12,7 +12,7 @@ LOG_FILE="${LOG_DIR}/server.log"
 
 echo "[console-log-server] 포트 ${PORT}에서 실행할 프로세스를 종료합니다(있다면)."
 if PIDS="$(lsof -ti TCP:"${PORT}" 2>/dev/null)"; then
-  if [[ -n "${PIDS}" ]]; then
+  if [ -n "${PIDS}" ]; then
     echo "  기존 프로세스 종료: ${PIDS}"
     kill ${PIDS}
   else
