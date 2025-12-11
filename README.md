@@ -30,7 +30,7 @@ console_log_server/
 ## 요구 사항
 
 - [uv](https://github.com/astral-sh/uv) 0.2.0 이상
-- Python 3.14+
+- Python 3.10~3.12
 - 로컬 Ollama에서 `qwen3:1.7b` 모델이 준비되어 있어야 `/ai/chat` 엔드포인트가 동작합니다. (`ollama pull qwen3:1.7b`)
 
 ## 빠른 시작
@@ -41,6 +41,12 @@ uv run console-log-server-dev
 ```
 
 개발 서버는 기본적으로 `http://127.0.0.1:8000`에서 동작합니다.
+
+## 로그
+
+- 기본 로그 파일: `logs/app.log` (회전 5MB x 5), `.env`의 `LOG_FILE`로 경로 변경 가능
+- 로그 레벨: `.env`의 `LOG_LEVEL` (`DEBUG`, `INFO` 등)
+- 요청 로깅: 메서드/경로/상태코드/소요시간/UA/IP를 미들웨어에서 기록합니다.
 
 ## 환경 변수
 
@@ -63,8 +69,12 @@ JWT_REFRESH_COOKIE_NAME=refresh_token
 JWT_REFRESH_COOKIE_SECURE=false
 JWT_REFRESH_COOKIE_SAMESITE=lax
 JWT_SESSION_COOKIE_NAME=session_id
+LOG_LEVEL=INFO
+LOG_FILE=logs/app.log
 OLLAMA_HOST=http://127.0.0.1:11434
 OLLAMA_MODEL=qwen3:1.7b
+GOOGLE_API_KEY=
+GOOGLE_CSE_ID=
 ```
 
 ## 데이터베이스 마이그레이션

@@ -5,6 +5,7 @@ from typing import Iterable
 
 from langchain_core.messages import BaseMessage
 
+from console_log_server.core.logging_config import get_logger
 from console_log_server.services.langgraph import (
     LangGraphChatOrchestrator,
     get_shared_orchestrator,
@@ -24,6 +25,7 @@ class AiChatService:
         self.client = client or OllamaClient()
         self.graph = graph or get_shared_orchestrator()
         self.use_langgraph = use_langgraph
+        self.logger = get_logger(__name__)
 
     def chat(
         self,
@@ -42,7 +44,15 @@ class AiChatService:
             if self.use_langgraph
             else self.client.chat(message.strip())
         )
-        return self._strip_think_block(raw_reply)
+        reply = self._strip_think_block(raw_reply)
+        self.logger.info(
+            "chat handled via=%s thread_id=%s len_in=%d len_out=%d",
+            "langgraph" if self.use_langgraph else "ollama_client",
+            thread_id or "default",
+            len(message),
+            len(reply),
+        )
+        return reply
 
     def _strip_think_block(self, text: str) -> str:
         """<think>...</think> 블록을 제거하여 사용자에겐 모델 답변만 전달."""
