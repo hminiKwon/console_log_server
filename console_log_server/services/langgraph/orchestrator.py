@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import json
-import sys
 from typing import Iterable
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from console_log_server.core import get_settings
 from console_log_server.core.logging_config import get_logger
-from console_log_server.services.langgraph.prompts import DEFAULT_SYSTEM_PROMPT
+from console_log_server.services.langgraph.prompts import (
+    DEFAULT_SYSTEM_PROMPT,
+    SEARCH_ROUTER_PROMPT,
+)
 from console_log_server.services.langgraph.state import ChatState
 from console_log_server.services.langgraph import tools
 from console_log_server.utils.ollama import OllamaClient
@@ -26,6 +27,8 @@ from console_log_server.utils.ollama import OllamaClient
 class LangGraphChatOrchestrator:
     """LangGraph 기반 챗봇 워크플로우 오케스트레이터."""
 
+    TIME_KEYWORDS = ("날짜", "오늘", "date", "time", "시간", "몇시", "몇 시")
+
     def __init__(
         self,
         *,
@@ -34,7 +37,6 @@ class LangGraphChatOrchestrator:
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         thread_namespace: str = "ai-chat",
     ) -> None:
-        settings = get_settings()
         self.llm_client = client or OllamaClient()
         self.checkpointer = checkpointer or MemorySaver()
         self.system_prompt = system_prompt
@@ -46,12 +48,21 @@ class LangGraphChatOrchestrator:
         workflow = StateGraph(ChatState)
 
         workflow.add_node("prepare", self._inject_system_prompt)
-        workflow.add_node("maybe_tools", self._maybe_use_tools)
+        workflow.add_node("plan_tools", self._plan_tool_usage)
+        workflow.add_node("apply_tools", self._apply_tools)
         workflow.add_node("generate", self._generate_reply)
 
         workflow.add_edge(START, "prepare")
-        workflow.add_edge("prepare", "maybe_tools")
-        workflow.add_edge("maybe_tools", "generate")
+        workflow.add_edge("prepare", "plan_tools")
+        workflow.add_conditional_edges(
+            "plan_tools",
+            self._route_from_plan,
+            {
+                "use_tools": "apply_tools",
+                "skip_tools": "generate",
+            },
+        )
+        workflow.add_edge("apply_tools", "generate")
         workflow.add_edge("generate", END)
 
         return workflow.compile(checkpointer=self.checkpointer)
@@ -131,29 +142,59 @@ class LangGraphChatOrchestrator:
             parts.append(f"[{role}]\n{msg.content}\n")
         return "\n".join(parts)
 
-    def _maybe_use_tools(self, state: ChatState) -> ChatState:
+    def _plan_tool_usage(self, state: ChatState) -> ChatState:
         """
-        LLM 판단 기반으로 검색 등 실시간 도구 결과를 히스토리에 주입.
+        사용자 메시지를 보고 도구 사용 여부만 결정.
 
-        - 날짜/시간 키워드는 로컬에서 즉시 처리
-        - 그 외는 LLM이 검색 필요 여부와 쿼리를 결정하여 Google 검색을 실행
+        - 날짜/시간 키워드는 즉시 플래그
+        - 검색 필요 여부는 LLM에 라우팅을 맡김
         """
 
         messages = list(state["messages"])
-        last_user = next((m for m in reversed(messages) if isinstance(m, HumanMessage)), None)
+        last_user = self._get_last_user(messages)
         if last_user is None:
-            return {"messages": messages}
+            return {"messages": messages, "tool_request": None}
 
-        content_lower = last_user.content.lower()
+        use_time = self._should_use_time(last_user.content)
+        use_search, search_query = self._decide_search_need(last_user.content)
+
+        return {
+            "messages": messages,
+            "tool_request": {
+                "use_time": use_time,
+                "use_search": use_search,
+                "search_query": search_query,
+            },
+        }
+
+    def _route_from_plan(self, state: ChatState) -> str:
+        """도구 플래그에 따라 분기."""
+
+        request = state.get("tool_request")
+        if request and (request.get("use_time") or request.get("use_search")):
+            return "use_tools"
+        return "skip_tools"
+
+    def _apply_tools(self, state: ChatState) -> ChatState:
+        """결정된 도구만 실행해 메시지에 주입."""
+
+        messages = list(state["messages"])
+        request = state.get("tool_request")
+        if not request:
+            return {"messages": messages, "tool_request": None}
+
         tool_outputs: list[str] = []
 
-        if any(keyword in content_lower for keyword in ["날짜", "오늘", "date", "time", "시간", "몇시", "몇 시"]):
+        if request.get("use_time"):
             tool_outputs.append(f"[time] {tools.get_current_datetime()}")
 
-        use_search, search_query = self._decide_search_need(last_user.content)
-        if use_search:
-            query = search_query or last_user.content
-            tool_outputs.append(f"[search] {tools.google_search(query)}")
+        if request.get("use_search"):
+            query = request.get("search_query") or self._get_last_user_content(messages)
+            if query:
+                tool_outputs.append(f"[search] {tools.google_search(query)}")
+            else:
+                self.logger.info("Skipping search tool: empty query")
+                request["use_search"] = False
 
         if tool_outputs:
             self.logger.info(
@@ -165,7 +206,7 @@ class LangGraphChatOrchestrator:
             injected = "실시간 도구 결과:\n" + "\n".join(f"- {t}" for t in tool_outputs)
             messages.append(SystemMessage(content=injected))
 
-        return {"messages": messages}
+        return {"messages": messages, "tool_request": None}
 
     def _decide_search_need(self, user_message: str) -> tuple[bool, str | None]:
         """
@@ -174,15 +215,7 @@ class LangGraphChatOrchestrator:
         반환: (use_search, query)
         """
 
-        prompt = (
-            "You are a routing assistant. Decide if web search is needed to answer "
-            "the user's message. Respond ONLY with JSON like "
-            '{"use_search":true/false,"query":"search keywords"}. '
-            "If the message asks for current events, live data, weather, locations, "
-            "news, schedules, or anything you are unsure about, set use_search to true. "
-            "If no search is needed, set use_search to false and query to an empty string. "
-            f"User message: {user_message!r}"
-        )
+        prompt = SEARCH_ROUTER_PROMPT.format(user_message=repr(user_message))
 
         try:
             raw = self.llm_client.chat(prompt)
@@ -194,6 +227,23 @@ class LangGraphChatOrchestrator:
         except Exception as exc:  # pragma: no cover - 방어적 로깅
             self.logger.warning("search_router_fallback err=%s", exc)
             return False, None
+
+    def _get_last_user(self, messages: list[BaseMessage]) -> HumanMessage | None:
+        """가장 최근 사용자 메시지 반환."""
+
+        return next((m for m in reversed(messages) if isinstance(m, HumanMessage)), None)
+
+    def _get_last_user_content(self, messages: list[BaseMessage]) -> str:
+        """검색 쿼리 폴백용 최근 사용자 메시지 내용."""
+
+        last_user = self._get_last_user(messages)
+        return last_user.content if last_user else ""
+
+    def _should_use_time(self, content: str) -> bool:
+        """시간 관련 키워드 여부만 판단."""
+
+        lowered = content.lower()
+        return any(keyword in lowered for keyword in self.TIME_KEYWORDS)
 
 
 _shared_orchestrator: LangGraphChatOrchestrator | None = None
