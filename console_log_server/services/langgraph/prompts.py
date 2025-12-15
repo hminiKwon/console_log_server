@@ -10,7 +10,7 @@ DEFAULT_SYSTEM_PROMPT = (
 SEARCH_ROUTER_PROMPT = (
     "You are a routing assistant. Decide if web search is needed to answer "
     "the user's message. Respond ONLY with JSON like "
-    '{"use_search":true/false,"query":"search keywords"}. '
+    '{{"use_search":true/false,"query":"search keywords"}}. '
     "If the message asks for current events, live data, weather, locations, "
     "news, schedules, or anything you are unsure about, set use_search to true. "
     "If no search is needed, set use_search to false and query to an empty string. "
