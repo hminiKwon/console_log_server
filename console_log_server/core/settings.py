@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen3:1.7b"
     google_api_key: str = ""
     google_cse_id: str = ""
+    janus_admin_url: str = ""
+    janus_admin_secret: str = ""
+    janus_api_secret: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

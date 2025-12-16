@@ -11,5 +11,6 @@ class Base(DeclarativeBase):
 
 from .user import User  # noqa: E402  # pylint: disable=wrong-import-position
 from .refresh_token import RefreshToken  # noqa: E402  # pylint: disable=wrong-import-position
+from .room import Room  # noqa: E402  # pylint: disable=wrong-import-position
 
-__all__ = ["Base", "User", "RefreshToken"]
+__all__ = ["Base", "User", "RefreshToken", "Room"]

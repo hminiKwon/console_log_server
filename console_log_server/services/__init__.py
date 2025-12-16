@@ -2,5 +2,6 @@
 
 from .ai import AiChatService
 from .auth import AuthService
+from .room import RoomService
 
-__all__ = ["AuthService", "AiChatService"]
+__all__ = ["AuthService", "AiChatService", "RoomService"]
