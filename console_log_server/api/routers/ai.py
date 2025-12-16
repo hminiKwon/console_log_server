@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from console_log_server.api.deps import get_app_settings, get_current_user
+from console_log_server.api.deps import get_current_user
 from console_log_server.api.schemas import AiChatRequest, AiChatResponse
-from console_log_server.core import Settings
 from console_log_server.models import User
 from console_log_server.services.ai import AiChatService
 
@@ -19,12 +18,11 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 )
 def chat(
     payload: AiChatRequest,
-    request: Request,
-    _: User = Depends(get_current_user),
-    settings: Settings = Depends(get_app_settings),
+    user: User = Depends(get_current_user),
 ) -> AiChatResponse:
     service = AiChatService()
-    thread_id = request.cookies.get(settings.jwt_session_cookie_name)
+    # 유저 ID를 thread_id로 사용해 사용자별 대화 메모리를 분리
+    thread_id = str(user.id) if user and user.id is not None else "default"
 
     try:
         reply = service.chat(payload.message, thread_id=thread_id)
