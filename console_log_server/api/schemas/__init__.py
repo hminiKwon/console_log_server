@@ -10,6 +10,7 @@ from .room import (
     RoomJoinResponse,
     RoomSummaryResponse,
 )
+from .fortune import FortuneRequest, FortuneResponse
 
 __all__ = [
     "HealthResponse",
@@ -26,4 +27,6 @@ __all__ = [
     "RoomJoinRequest",
     "RoomJoinResponse",
     "RoomSummaryResponse",
+    "FortuneRequest",
+    "FortuneResponse",
 ]
