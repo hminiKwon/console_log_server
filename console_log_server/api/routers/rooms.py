@@ -26,7 +26,6 @@ router = APIRouter(prefix="/rooms", tags=["rooms"])
 def create_room(
     payload: RoomCreateRequest,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
 ) -> RoomCreateResponse:
     room = RoomService(session).create_room(payload, creator_id=user.id)
     return _to_create_response(room)
@@ -39,7 +38,6 @@ def create_room(
 )
 def list_rooms(
     session: Session = Depends(get_db_session),
-    _: User = Depends(get_current_user),
 ) -> list[RoomSummaryResponse]:
     rooms = RoomService(session).list_active_rooms()
     return [_to_summary_response(room) for room in rooms]
@@ -54,7 +52,6 @@ def join_room(
     room_number: str,
     payload: RoomJoinRequest,
     session: Session = Depends(get_db_session),
-    _: User = Depends(get_current_user),
 ) -> RoomJoinResponse:
     room = RoomService(session).join_room(room_number, password=payload.password)
     return _to_join_response(room)
