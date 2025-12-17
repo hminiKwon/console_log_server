@@ -26,6 +26,7 @@ router = APIRouter(prefix="/rooms", tags=["rooms"])
 def create_room(
     payload: RoomCreateRequest,
     session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
 ) -> RoomCreateResponse:
     room = RoomService(session).create_room(payload, creator_id=user.id)
     return _to_create_response(room)
