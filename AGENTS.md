@@ -1,42 +1,24 @@
-# Codex 작업 가이드
+# Repository Guidelines
 
-## 프로젝트 개요
-- FastAPI 기반 콘솔 로그 서버 템플릿입니다.
-- 앱 팩토리와 엔트리포인트는 `console_log_server/app.py`와 `console_log_server/main.py`에 있습니다.
-- 설정은 `console_log_server/core/settings.py`에서 `.env`를 읽어 캐시된 `get_settings()`로 제공합니다.
-- 요청 로깅 및 파일 로깅은 `console_log_server/core/logging_config.py`와 미들웨어에서 처리합니다.
+## 프로젝트 구조 & 모듈 구성
+핵심 애플리케이션은 `console_log_server/`에 있으며, FastAPI 앱 팩토리는 `app.py`, 실행 엔트리포인트는 `main.py`에 있습니다. API 라우터와 DTO 스키마는 각각 `console_log_server/api/routers`, `console_log_server/api/schemas`에서 관리합니다. 설정과 DB 연결은 `console_log_server/core`에 모여 있고, 도메인 계층은 `models/`, `repositories/`, `services/`로 분리되어 있습니다. 테스트는 `tests/`, 마이그레이션은 `alembic/` 디렉터리를 사용합니다.
 
-## 실행/개발 명령
-- 의존성 설치: `uv sync`
-- 개발 서버(리로드): `uv run console-log-server-dev`
-- 운영 서버: `uv run console-log-server`
-- 백그라운드 실행 스크립트: `./run_server_bg.sh` (환경 변수 `PORT`, `APP_CMD` 지원)
+## 빌드, 테스트, 개발 명령
+- `uv sync`: 런타임 의존성 설치.
+- `uv run console-log-server-dev`: 로컬 개발 서버 실행(기본 `http://127.0.0.1:8000`).
+- `uv run console-log-server`: 프로덕션 엔트리포인트 실행.
+- `uv run alembic upgrade head`: 최신 스키마 적용.
+- `uv run alembic revision --autogenerate -m "message"`: 새 마이그레이션 생성.
+- `uv sync --extra test` 후 `uv run pytest`: 테스트 의존성 설치 및 실행.
 
-## 폴더 구조 요약
-- `console_log_server/api`: 라우터/스키마/의존성 주입
-- `console_log_server/services`: 비즈니스 로직 (`auth`, `room`, `ai`, `fortune`, `janus`, `langgraph`)
-- `console_log_server/repositories`: 데이터 접근 계층
-- `console_log_server/models`: SQLAlchemy ORM 모델
-- `console_log_server/core`: 설정, DB, 로깅
-- `tests`: pytest 스위트
+## 코딩 스타일 & 네이밍 규칙
+Python PEP 8을 따르고 들여쓰기는 4칸을 사용합니다. 모듈/함수/변수는 `snake_case`, 클래스와 Pydantic 스키마는 `PascalCase`를 권장합니다. 라우터는 기능 단위로 `console_log_server/api/routers`에 추가하고, 대응하는 스키마는 `console_log_server/api/schemas`에 배치하세요.
 
-## 주요 엔드포인트
-- `GET /health`, `GET /hello`, `POST /auth/*`, `POST /ai/chat`, `POST /fortune/today`, `POST /rooms/*`
-- 보호된 엔드포인트는 `Authorization: Bearer <token>` 필요 (`console_log_server/api/deps.py`).
+## 테스트 가이드라인
+테스트 프레임워크는 `pytest`이며 파일명은 `test_*.py` 규칙을 따릅니다(예: `tests/test_api.py`). 신규 엔드포인트나 설정 변경 시 최소 1개의 테스트를 추가하고, 공통 픽스처는 `tests/conftest.py`를 재사용합니다.
 
-## 외부 의존 및 환경
-- Python 버전: `.python-version` 및 `pyproject.toml` 기준 3.14+
-- DB: MySQL + SQLAlchemy(`pymysql`), URL은 `Settings.database_url`
-- 마이그레이션: Alembic (`alembic/`, `alembic.ini`)
-- LLM: 로컬 Ollama 필요 (`OLLAMA_HOST`, `OLLAMA_MODEL`) — `/ai/chat`, `/fortune/today` 사용
-- Janus 연동: 방 생성/삭제 시 Admin API 호출 (`janus_*` 환경 변수)
+## 커밋 & PR 가이드라인
+커밋 메시지는 `type: 요약` 형식으로 작성합니다(예: `feat: 인증 리프레시 추가`). 타입은 `feat`, `fix`, `docs`, `refactor`, `test`, `chore`를 사용합니다. PR에는 변경 요약, 마이그레이션/환경변수 변경 여부, 실행한 테스트 명령을 명시하세요.
 
-## 테스트
-- `uv sync --extra test`
-- `uv run pytest`
-- 테스트는 인메모리 SQLite로 DB 세션을 오버라이드합니다.
-
-## 작업 시 유의사항
-- 라우터 추가/변경은 `console_log_server/api/routers/__init__.py` 등록 필요.
-- 설정값 변경 시 `get_settings()` 캐시를 고려해야 합니다.
-- 기존 스타일(타입 힌트, 함수형 구조)을 유지하고 불필요한 포맷 변경은 피합니다.
+## 설정 & 보안 팁
+런타임 설정은 `.env`에서 읽습니다(`README.md`의 기본값 참고). `JWT_SECRET_KEY`, `GOOGLE_API_KEY`, DB 비밀번호 같은 민감 정보는 커밋하지 마세요. AI 챗 엔드포인트를 사용할 경우 `OLLAMA_HOST`와 `OLLAMA_MODEL`이 로컬 Ollama 설정과 일치해야 합니다.
