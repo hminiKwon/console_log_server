@@ -79,8 +79,19 @@ class LangGraphChatOrchestrator:
         """로컬 Ollama 클라이언트를 호출해 답변을 생성."""
 
         prompt = self._to_prompt(state["messages"])
-        self.logger.debug("Generating reply via Ollama prompt_len=%d", len(prompt))
-        content = self.llm_client.chat(prompt)
+        use_thinking = bool(state.get("use_thinking"))
+        model_name = self.llm_client.resolve_model_name(use_thinking=use_thinking)
+        self.logger.info(
+            "Generating reply via=%s model=%s prompt_len=%d",
+            "thinking" if use_thinking else "instruct",
+            model_name,
+            len(prompt),
+        )
+        content = (
+            self.llm_client.think(prompt)
+            if use_thinking
+            else self.llm_client.chat(prompt)
+        )
         ai_msg = AIMessage(content=content)
         messages = list(state["messages"]) + [ai_msg]
         return {"messages": messages}
@@ -157,6 +168,7 @@ class LangGraphChatOrchestrator:
 
         use_time = self._should_use_time(last_user.content)
         use_search, search_query = self._decide_search_need(last_user.content)
+        use_thinking = self.llm_client.should_use_thinking(last_user.content)
 
         return {
             "messages": messages,
@@ -165,6 +177,7 @@ class LangGraphChatOrchestrator:
                 "use_search": use_search,
                 "search_query": search_query,
             },
+            "use_thinking": use_thinking,
         }
 
     def _route_from_plan(self, state: ChatState) -> str:
@@ -181,7 +194,11 @@ class LangGraphChatOrchestrator:
         messages = list(state["messages"])
         request = state.get("tool_request")
         if not request:
-            return {"messages": messages, "tool_request": None}
+            return {
+                "messages": messages,
+                "tool_request": None,
+                "use_thinking": state.get("use_thinking"),
+            }
 
         tool_outputs: list[str] = []
 
@@ -206,7 +223,11 @@ class LangGraphChatOrchestrator:
             injected = "실시간 도구 결과:\n" + "\n".join(f"- {t}" for t in tool_outputs)
             messages.append(SystemMessage(content=injected))
 
-        return {"messages": messages, "tool_request": None}
+        return {
+            "messages": messages,
+            "tool_request": None,
+            "use_thinking": state.get("use_thinking"),
+        }
 
     def _decide_search_need(self, user_message: str) -> tuple[bool, str | None]:
         """
@@ -218,7 +239,7 @@ class LangGraphChatOrchestrator:
         prompt = SEARCH_ROUTER_PROMPT.format(user_message=repr(user_message))
 
         try:
-            raw = self.llm_client.chat(prompt)
+            raw = self.llm_client.think(prompt)
             self.logger.debug("search_router raw=%s", raw)
             data = json.loads(raw)
             use_search = bool(data.get("use_search"))

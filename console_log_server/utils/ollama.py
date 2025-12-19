@@ -8,12 +8,29 @@ from urllib.request import Request, urlopen
 from console_log_server.core import get_settings
 
 
+THINKING_ROUTER_PROMPT = (
+    "You are a routing assistant. Decide if the user's message requires deep, "
+    "multi-step reasoning, careful planning, or complex analysis. "
+    "Respond ONLY with JSON like {{\"use_thinking\":true/false}}. "
+    "Use true for multi-constraint tasks, proofs, debugging, or long-term planning. "
+    "Use false for simple Q&A, small talk, or direct factual answers. "
+    "User message: {user_message}"
+)
+
+
 class OllamaConfig:
     """Ollama 호출 설정."""
 
-    def __init__(self, *, host: str, model: str) -> None:
+    def __init__(
+        self,
+        *,
+        host: str,
+        instruct_model: str,
+        thinking_model: str | None = None,
+    ) -> None:
         self.host = host
-        self.model = model
+        self.instruct_model = instruct_model
+        self.thinking_model = thinking_model
 
 
 class OllamaClient:
@@ -22,11 +39,13 @@ class OllamaClient:
     def __init__(self, config: OllamaConfig | None = None) -> None:
         self.config = config or self._config_from_settings()
 
-    def chat(self, message: str) -> str:
+    def chat(self, message: str, *, model: str | None = None) -> str:
         """주어진 메시지로 챗봇 응답을 요청."""
 
+        model_name = self.resolve_model_name(model=model)
+
         payload: dict[str, Any] = {
-            "model": self.config.model,
+            "model": model_name,
             "messages": [{"role": "user", "content": message}],
             "stream": False,
         }
@@ -56,6 +75,45 @@ class OllamaClient:
 
         return str(content)
 
+    def think(self, message: str) -> str:
+        """생각용 모델로 요청(없으면 instruct 모델로 대체)."""
+
+        model_name = self.resolve_model_name(use_thinking=True)
+        return self.chat(message, model=model_name)
+
+    def resolve_model_name(
+        self,
+        *,
+        use_thinking: bool = False,
+        model: str | None = None,
+    ) -> str:
+        """사용할 모델 이름을 결정."""
+
+        if model:
+            return model
+        if use_thinking and self.config.thinking_model:
+            return self.config.thinking_model
+        return self.config.instruct_model
+
+    def should_use_thinking(self, message: str) -> bool:
+        """사용자 메시지에 대해 thinking 모델 필요 여부를 판단."""
+
+        prompt = THINKING_ROUTER_PROMPT.format(user_message=repr(message))
+        try:
+            raw = self.chat(prompt)
+            data = json.loads(raw)
+        except Exception:  # pragma: no cover - 라우팅 실패 시 기본값
+            return False
+
+        use_thinking = data.get("use_thinking")
+        if isinstance(use_thinking, str):
+            return use_thinking.strip().lower() == "true"
+        return bool(use_thinking)
+
     def _config_from_settings(self) -> OllamaConfig:
         settings = get_settings()
-        return OllamaConfig(host=settings.ollama_host, model=settings.ollama_model)
+        return OllamaConfig(
+            host=settings.ollama_host,
+            instruct_model=settings.ollama_instruct_model,
+            thinking_model=settings.ollama_thinking_model,
+        )

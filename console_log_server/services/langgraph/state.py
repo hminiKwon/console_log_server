@@ -21,3 +21,4 @@ class ChatState(TypedDict):
 
     messages: Annotated[List[BaseMessage], add_messages]
     tool_request: NotRequired[ToolRequest | None]
+    use_thinking: NotRequired[bool]

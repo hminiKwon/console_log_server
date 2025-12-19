@@ -36,20 +36,33 @@ class AiChatService:
     ) -> str:
         """사용자 메시지에 대한 모델 응답을 반환."""
 
-        if not message.strip():
+        clean_message = message.strip()
+        if not clean_message:
             raise ValueError("메시지는 비어 있을 수 없습니다.")
 
-        raw_reply = (
-            self._chat_via_graph(message.strip(), thread_id=thread_id, history=history)
-            if self.use_langgraph
-            else self.client.chat(message.strip())
-        )
+        if self.use_langgraph:
+            raw_reply = self._chat_via_graph(
+                clean_message, thread_id=thread_id, history=history
+            )
+            via = "langgraph"
+            model_name = "langgraph-auto"
+        else:
+            use_thinking = self.client.should_use_thinking(clean_message)
+            model_name = self.client.resolve_model_name(use_thinking=use_thinking)
+            raw_reply = (
+                self.client.think(clean_message)
+                if use_thinking
+                else self.client.chat(clean_message)
+            )
+            via = "ollama_client_thinking" if use_thinking else "ollama_client"
+
         reply = self._strip_think_block(raw_reply)
         self.logger.info(
-            "chat handled via=%s thread_id=%s len_in=%d len_out=%d",
-            "langgraph" if self.use_langgraph else "ollama_client",
+            "chat handled via=%s model=%s thread_id=%s len_in=%d len_out=%d",
+            via,
+            model_name,
             thread_id or "default",
-            len(message),
+            len(clean_message),
             len(reply),
         )
         return reply

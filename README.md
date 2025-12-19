@@ -31,7 +31,7 @@ console_log_server/
 
 - [uv](https://github.com/astral-sh/uv) 0.2.0 이상
 - Python 3.10~3.12
-- 로컬 Ollama에서 `qwen3:1.7b` 모델이 준비되어 있어야 `/ai/chat` 엔드포인트가 동작합니다. (`ollama pull qwen3:1.7b`)
+- 로컬 Ollama에 instruct 모델(`OLLAMA_INSTRUCT_MODEL`)과 thinking 모델(`OLLAMA_THINKING_MODEL`)이 준비되어 있어야 `/ai/chat` 엔드포인트가 동작합니다.
 
 ## 빠른 시작
 
@@ -72,7 +72,8 @@ JWT_SESSION_COOKIE_NAME=session_id
 LOG_LEVEL=INFO
 LOG_FILE=logs/app.log
 OLLAMA_HOST=http://127.0.0.1:11434
-OLLAMA_MODEL=qwen3:1.7b
+OLLAMA_INSTRUCT_MODEL=qwen3:1.7b
+OLLAMA_THINKING_MODEL=qwen3-vl:30b
 GOOGLE_API_KEY=
 GOOGLE_CSE_ID=
 ```

@@ -30,16 +30,16 @@ def create_app() -> FastAPI:
 
     init_app(app)
 
-    app.add_middleware(
-        CORSMiddleware,
-        # allow_origins=[
-        #     "http://localhost:3000",
-        #     "https://www.hmini.co.kr",
-        # ],
-        # allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    if settings.debug:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[
+                "http://localhost:3000",
+            ],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     logger = get_logger("console_log_server.request")
 

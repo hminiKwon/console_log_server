@@ -21,4 +21,4 @@ Python PEP 8을 따르고 들여쓰기는 4칸을 사용합니다. 모듈/함수
 커밋 메시지는 `type: 요약` 형식으로 작성합니다(예: `feat: 인증 리프레시 추가`). 타입은 `feat`, `fix`, `docs`, `refactor`, `test`, `chore`를 사용합니다. PR에는 변경 요약, 마이그레이션/환경변수 변경 여부, 실행한 테스트 명령을 명시하세요.
 
 ## 설정 & 보안 팁
-런타임 설정은 `.env`에서 읽습니다(`README.md`의 기본값 참고). `JWT_SECRET_KEY`, `GOOGLE_API_KEY`, DB 비밀번호 같은 민감 정보는 커밋하지 마세요. AI 챗 엔드포인트를 사용할 경우 `OLLAMA_HOST`와 `OLLAMA_MODEL`이 로컬 Ollama 설정과 일치해야 합니다.
+런타임 설정은 `.env`에서 읽습니다(`README.md`의 기본값 참고). `JWT_SECRET_KEY`, `GOOGLE_API_KEY`, DB 비밀번호 같은 민감 정보는 커밋하지 마세요. AI 챗 엔드포인트를 사용할 경우 `OLLAMA_HOST`와 `OLLAMA_INSTRUCT_MODEL`이 로컬 Ollama 설정과 일치해야 합니다.
