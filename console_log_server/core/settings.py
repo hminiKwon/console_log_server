@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -34,6 +35,8 @@ class Settings(BaseSettings):
     janus_admin_url: str = ""
     janus_admin_secret: str = ""
     janus_api_secret: str = ""
+    mcp_servers_file: str | None = "config/mcp_servers.json"
+    mcp_servers: list[dict[str, Any]] = []
 
     model_config = SettingsConfigDict(
         env_file=".env",

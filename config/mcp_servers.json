@@ -1,0 +1,9 @@
+[
+  {
+    "name": "echo",
+    "description": "Local MCP test server",
+    "transport": "stdio",
+    "command": "python",
+    "args": ["-m", "console_log_server.mcp.echo_server"]
+  }
+]

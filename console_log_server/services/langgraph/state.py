@@ -14,6 +14,10 @@ class ToolRequest(TypedDict):
     use_time: bool
     use_search: bool
     search_query: str | None
+    use_mcp: bool
+    mcp_server: str | None
+    mcp_tool: str | None
+    mcp_arguments: dict[str, object] | None
 
 
 class ChatState(TypedDict):

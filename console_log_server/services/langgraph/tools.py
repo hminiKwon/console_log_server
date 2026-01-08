@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import urllib.error
 import urllib.parse
@@ -10,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from console_log_server.core import get_settings
 from console_log_server.core.logging_config import get_logger
+from console_log_server.services.mcp.manager import McpClientManager
 
 logger = get_logger(__name__)
 
@@ -71,3 +73,67 @@ def google_search(query: str, *, num_results: int = 3) -> str:
     result = "google_search_results:\n" + "\n".join(lines)
     logger.debug("google_search query=%s results=%d", query, len(lines))
     return result
+
+
+def list_mcp_tool_catalog() -> list[dict[str, Any]]:
+    """등록된 MCP 서버와 도구 목록을 수집."""
+
+    manager = McpClientManager()
+    servers = manager.list_servers()
+    if not servers:
+        return []
+
+    async def _collect() -> list[dict[str, Any]]:
+        async def _fetch(server):
+            try:
+                tools = await manager.list_tools(server.name)
+            except Exception as exc:  # noqa: BLE001 - 외부 도구 방어
+                logger.warning("mcp tool list failed server=%s err=%s", server.name, exc)
+                return None
+            return {
+                "server": server.name,
+                "description": server.description,
+                "tools": tools,
+            }
+
+        results = await asyncio.gather(*[_fetch(server) for server in servers])
+        return [item for item in results if item]
+
+    return _run_async(_collect(), fallback=[])
+
+
+def call_mcp_tool(
+    server_name: str,
+    tool_name: str,
+    arguments: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """MCP 도구 호출 결과를 반환."""
+
+    manager = McpClientManager()
+
+    async def _call():
+        return await manager.call_tool(
+            server_name,
+            tool_name,
+            arguments=arguments,
+        )
+
+    try:
+        result = _run_async(_call(), fallback=None)
+        return result if isinstance(result, dict) else None
+    except Exception as exc:  # noqa: BLE001 - 외부 도구 방어
+        logger.warning(
+            "mcp tool call failed server=%s tool=%s err=%s",
+            server_name,
+            tool_name,
+            exc,
+        )
+        return None
+
+
+def _run_async(coro, *, fallback):
+    try:
+        return asyncio.run(coro)
+    except Exception as exc:  # noqa: BLE001 - 외부 도구 방어
+        logger.warning("mcp async run failed err=%s", exc)
+        return fallback

@@ -76,7 +76,24 @@ OLLAMA_INSTRUCT_MODEL=qwen3:1.7b
 OLLAMA_THINKING_MODEL=qwen3-vl:30b
 GOOGLE_API_KEY=
 GOOGLE_CSE_ID=
+MCP_SERVERS_FILE=config/mcp_servers.json
+MCP_SERVERS=
 ```
+
+## MCP (Model Context Protocol)
+
+테스트용 MCP 서버 정의는 `config/mcp_servers.json`에 기본 제공됩니다. 현재는 `stdio` 전송 방식만 지원합니다. 실행 중인 API에서 MCP 서버와 도구를 확인하려면 아래 엔드포인트를 사용하세요.
+
+- `GET /mcp/servers` — 등록된 MCP 서버 목록
+- `GET /mcp/servers/{server_name}/tools` — 도구 목록 조회
+- `POST /mcp/servers/{server_name}/tools/{tool_name}` — 도구 실행
+
+### 서버 추가 방법
+
+1) `config/mcp_servers.json`에 서버 정보를 추가합니다.
+2) 다른 설정을 사용하고 싶으면 `.env`에 `MCP_SERVERS_FILE` 경로를 지정합니다.
+3) 즉시 오버라이드하려면 `.env`에 `MCP_SERVERS` JSON 리스트를 지정합니다.
+4) 간단히 테스트하려면 기본 `echo` 서버를 사용하세요(도구 호출 시 stdio 프로세스로 자동 실행).
 
 ## 데이터베이스 마이그레이션
 

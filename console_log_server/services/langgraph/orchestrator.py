@@ -11,6 +11,7 @@ from console_log_server.core.logging_config import get_logger
 from console_log_server.services.langgraph.prompts import (
     DEFAULT_SYSTEM_PROMPT,
     SEARCH_ROUTER_PROMPT,
+    MCP_ROUTER_PROMPT,
 )
 from console_log_server.services.langgraph.state import ChatState
 from console_log_server.services.langgraph import tools
@@ -168,6 +169,10 @@ class LangGraphChatOrchestrator:
 
         use_time = self._should_use_time(last_user.content)
         use_search, search_query = self._decide_search_need(last_user.content)
+        mcp_catalog = tools.list_mcp_tool_catalog()
+        use_mcp, mcp_server, mcp_tool, mcp_arguments = self._decide_mcp_tool_use(
+            last_user.content, mcp_catalog
+        )
         use_thinking = self.llm_client.should_use_thinking(last_user.content)
 
         return {
@@ -176,6 +181,10 @@ class LangGraphChatOrchestrator:
                 "use_time": use_time,
                 "use_search": use_search,
                 "search_query": search_query,
+                "use_mcp": use_mcp,
+                "mcp_server": mcp_server,
+                "mcp_tool": mcp_tool,
+                "mcp_arguments": mcp_arguments,
             },
             "use_thinking": use_thinking,
         }
@@ -184,7 +193,11 @@ class LangGraphChatOrchestrator:
         """도구 플래그에 따라 분기."""
 
         request = state.get("tool_request")
-        if request and (request.get("use_time") or request.get("use_search")):
+        if request and (
+            request.get("use_time")
+            or request.get("use_search")
+            or request.get("use_mcp")
+        ):
             return "use_tools"
         return "skip_tools"
 
@@ -213,12 +226,28 @@ class LangGraphChatOrchestrator:
                 self.logger.info("Skipping search tool: empty query")
                 request["use_search"] = False
 
+        if request.get("use_mcp"):
+            server = request.get("mcp_server")
+            tool = request.get("mcp_tool")
+            arguments = request.get("mcp_arguments") or {}
+            if server and tool:
+                result = tools.call_mcp_tool(server, tool, arguments=arguments)
+                if result is None:
+                    tool_outputs.append(f"[mcp:{server}/{tool}] mcp_tool_error")
+                else:
+                    rendered = self._render_mcp_result(result)
+                    tool_outputs.append(f"[mcp:{server}/{tool}] {rendered}")
+            else:
+                self.logger.info("Skipping mcp tool: missing server/tool")
+                request["use_mcp"] = False
+
         if tool_outputs:
             self.logger.info(
-                "Tool triggers thread_ns=%s time=%s search=%s",
+                "Tool triggers thread_ns=%s time=%s search=%s mcp=%s",
                 self.thread_namespace,
                 any("time" in t for t in tool_outputs),
                 any("search" in t for t in tool_outputs),
+                any("mcp:" in t for t in tool_outputs),
             )
             injected = "실시간 도구 결과:\n" + "\n".join(f"- {t}" for t in tool_outputs)
             messages.append(SystemMessage(content=injected))
@@ -249,6 +278,43 @@ class LangGraphChatOrchestrator:
             self.logger.warning("search_router_fallback err=%s", exc)
             return False, None
 
+    def _decide_mcp_tool_use(
+        self,
+        user_message: str,
+        tool_catalog: list[dict[str, object]],
+    ) -> tuple[bool, str | None, str | None, dict[str, object] | None]:
+        if not tool_catalog:
+            return False, None, None, None
+
+        prompt = MCP_ROUTER_PROMPT.format(
+            user_message=repr(user_message),
+            tools_json=json.dumps(tool_catalog),
+        )
+
+        try:
+            raw = self.llm_client.think(prompt)
+            self.logger.debug("mcp_router raw=%s", raw)
+            data = json.loads(raw)
+            use_mcp = bool(data.get("use_mcp"))
+        except Exception as exc:  # pragma: no cover - 방어적 로깅
+            self.logger.warning("mcp_router_fallback err=%s", exc)
+            return False, None, None, None
+
+        if not use_mcp:
+            return False, None, None, None
+
+        server = str(data.get("server") or "").strip()
+        tool = str(data.get("tool") or "").strip()
+        arguments = data.get("arguments")
+        if not isinstance(arguments, dict):
+            arguments = {}
+
+        if not self._is_mcp_tool_available(tool_catalog, server, tool):
+            self.logger.info("mcp tool not available server=%s tool=%s", server, tool)
+            return False, None, None, None
+
+        return True, server, tool, arguments
+
     def _get_last_user(self, messages: list[BaseMessage]) -> HumanMessage | None:
         """가장 최근 사용자 메시지 반환."""
 
@@ -265,6 +331,39 @@ class LangGraphChatOrchestrator:
 
         lowered = content.lower()
         return any(keyword in lowered for keyword in self.TIME_KEYWORDS)
+
+    def _is_mcp_tool_available(
+        self,
+        tool_catalog: list[dict[str, object]],
+        server: str,
+        tool: str,
+    ) -> bool:
+        if not server or not tool:
+            return False
+        for entry in tool_catalog:
+            if entry.get("server") != server:
+                continue
+            tools_list = entry.get("tools")
+            if isinstance(tools_list, list) and any(
+                tool == item.get("name") for item in tools_list if isinstance(item, dict)
+            ):
+                return True
+        return False
+
+    def _render_mcp_result(self, result: dict[str, object]) -> str:
+        content = result.get("content")
+        if not isinstance(content, list):
+            content = [content] if content is not None else []
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict) and "text" in item:
+                parts.append(str(item["text"]))
+            else:
+                parts.append(json.dumps(item))
+        rendered = "\n".join(part for part in parts if part)
+        if result.get("is_error"):
+            return f"mcp_tool_error: {rendered or 'empty'}"
+        return rendered or "empty"
 
 
 _shared_orchestrator: LangGraphChatOrchestrator | None = None
